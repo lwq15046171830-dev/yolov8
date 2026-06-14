@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLOv8 野生动物检测</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(4px);
+        }
+
+        .card h2 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.5em;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .upload-area.drag-over {
+            border-color: #764ba2;
+            background: #e8e9ff;
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .results {
+            margin-top: 20px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .image-preview {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .detection-stats {
+            background: #f8f9ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+        }
+
+        .stat-value {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .detection-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .detection-item {
+            background: #f8f9ff;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .detection-class {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .detection-confidence {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            margin-left: 8px;
+        }
+
+        .info-section {
+            background: #f0f4ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .info-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #c33;
+        }
+
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3c3;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: #999;
+            font-size: 1em;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🦁 YOLOv8 野生动物检测</h1>
+            <p class="subtitle">实时识���图像中的野生动物</p>
+        </header>
+
+        <div class="main-content">
+            <!-- 左侧：上传区域 -->
+            <div class="card">
+                <h2>📤 上传图像</h2>
+                
+                <div class="tabs">
+                    <button class="tab active" data-tab="image">图像</button>
+                    <button class="tab" data-tab="info">信息</button>
+                </div>
+
+                <div id="image-tab" class="tab-content active">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">📁</div>
+                        <p class="upload-text"><strong>点击上传</strong> 或 <strong>拖放图像</strong></p>
+                        <p style="color: #999; font-size: 0.9em;">支持格式: JPG, PNG, GIF</p>
+                    </div>
+                    <input type="file" id="fileInput" accept="image/*">
+                    <button class="btn" onclick="document.getElementById('fileInput').click()">选择文件</button>
+                </div>
+
+                <div id="info-tab" class="tab-content">
+                    <div class="info-section">
+                        <div class="info-title">📊 模型信息</div>
+                        <div style="font-size: 0.9em; color: #666; line-height: 1.8;">
+                            <p><strong>模型:</strong> YOLOv8 Small</p>
+                            <p><strong>数据集:</strong> COCO</p>
+                            <p><strong>识别类别:</strong> 80 种</p>
+                            <p><strong>支持动物:</strong> 狗、猫、鸟、马、羊、牛、大象、熊、斑马、长颈鹿等</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：结果显示 -->
+            <div class="card">
+                <h2>🔍 检测结果</h2>
+                
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>正在检测中...</p>
+                </div>
+
+                <div id="results" class="results" style="display: none;">
+                    <div id="resultImage"></div>
+                    
+                    <div class="detection-stats">
+                        <div class="stat-item">
+                            <span>检测到的对象数:</span>
+                            <span class="stat-value" id="detectionCount">0</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 style="margin-bottom: 10px; color: #333;">🦁 检测到的动物:</h3>
+                        <div class="detection-list" id="detectionList"></div>
+                    </div>
+                </div>
+
+                <div id="errorMessage" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const errorMessage = document.getElementById('errorMessage');
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(tc => tc.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tabName + '-tab').classList.add('active');
+            });
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                detectImage();
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            detectImage();
+        });
+
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        function showError(message) {
+            errorMessage.innerHTML = `<div class="error">❌ ${message}</div>`;
+            errorMessage.style.display = 'block';
+            results.style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            errorMessage.innerHTML = `<div class="success">✅ ${message}</div>`;
+            errorMessage.style.display = 'block';
+        }
+
+        function detectImage() {
+            if (fileInput.files.length === 0) {
+                showError('请选择一张图像');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            loading.classList.add('show');
+            results.style.display = 'none';
+            errorMessage.style.display = 'none';
+
+            fetch('/api/detect', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                loading.classList.remove('show');
+                
+                if (data.success) {
+                    showSuccess(`检测完成！找到 ${data.detection_count} 个对象`);
+                    displayResults(data);
+                } else {
+                    showError(data.error || '检测失败');
+                }
+            })
+            .catch(error => {
+                loading.classList.remove('show');
+                showError('网络错误: ' + error.message);
+            });
+        }
+
+        function displayResults(data) {
+            const resultImage = document.getElementById('resultImage');
+            resultImage.innerHTML = `<img src="${data.result_image}" class="image-preview" alt="检测结果">`;
+
+            document.getElementById('detectionCount').textContent = data.detection_count;
+
+            const detectionList = document.getElementById('detectionList');
+            if (data.detections.length === 0) {
+                detectionList.innerHTML = '<p style="color: #999;">未检测到任何对象</p>';
+            } else {
+                detectionList.innerHTML = data.detections.map(det => `
+                    <div class="detection-item">
+                        <span class="detection-class">${det.class}</span>
+                        <span class="detection-confidence">${(det.confidence * 100).toFixed(1)}%</span>
+                    </div>
+                `).join('');
+            }
+
+            results.style.display = 'block';
+        }
+
+        window.addEventListener('load', () => {
+            fetch('/api/classes')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('✅ Model loaded with', data.total_classes, 'classes');
+                })
+                .catch(error => console.error('❌ Error:', error));
+        });
+    </script>
+</body>
+</html>
